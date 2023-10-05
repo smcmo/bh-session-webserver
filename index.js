@@ -24,7 +24,7 @@ function handleMessage(message, ws) {
 	if (!message.type) {
 		ws.send(
 			JSON.stringify({
-				error: true,
+				success: false,
 				reason: 'Failed to provide a valid message type property',
 			})
 		)
@@ -33,10 +33,11 @@ function handleMessage(message, ws) {
 			case 'admin_request':
 				return appointSessionAdmin(ws)
 			case 'begin_session':
+				return initializeSession(message.data, ws)
 			default:
 				ws.send(
 					JSON.stringify({
-						error: true,
+						success: false,
 						reason: 'The provided message type does not exist',
 					})
 				)
@@ -45,20 +46,48 @@ function handleMessage(message, ws) {
 }
 
 let admin = null
-function appointSessionAdmin(ws) {
+function appointSessionAdmin(client) {
 	if (admin !== null) {
-		ws.send(
+		client.send(
 			JSON.stringify({
-				requestAccepted: false,
+				success: false,
 				reason: 'There is already another client designated as admin',
 			})
 		)
 	} else {
-		admin = ws
+		admin = client
 		admin.send(
 			JSON.stringify({
-				requestAccepted: true,
+				success: true,
 			})
 		)
 	}
+}
+
+let sessionData = {}
+function initializeSession(data, client) {
+	if (client !== admin) {
+		return client.send(
+			JSON.stringify({
+				success: false,
+				reason: 'You are not allowed to perform that action as you are not the current session admin',
+			})
+		)
+	}
+
+	if (!data) {
+		return client.send(
+			JSON.stringify({
+				success: false,
+				reason: 'Message is missing data property',
+			})
+		)
+	}
+
+	sessionData = data
+	return admin.send(
+		JSON.stringify({
+			success: true,
+		})
+	)
 }
