@@ -10,7 +10,6 @@
       "name": "Start webserver",
       "skipFiles": ["<node_internals>/**"],
       "command": "npm start",
-      "outputCapture": "std"
     },
 	]
 }
