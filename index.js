@@ -1,23 +1,26 @@
-import { createServer } from 'https'
-import { readFileSync } from 'fs'
+import http from 'http'
+import https from 'https'
+import fs from 'fs'
 import { WebSocketServer } from 'ws'
-import { parseIncoming } from './functions/parseIncoming.js'
 
-const server = createServer({
-	cert: readFileSync('../../etc/letsencrypt/live/server.smcmo.dev/fullchain.pem'),
-	key: readFileSync('../../etc/letsencrypt/live/server.smcmo.dev/privkey.pem'),
-})
+let server, port
+if (process.env.NODE_ENVIRONMENT === 'production') {
+	server = https.createServer({
+		cert: fs.readFileSync('../../etc/letsencrypt/live/server.smcmo.dev/fullchain.pem'),
+		key: fs.readFileSync('../../etc/letsencrypt/live/server.smcmo.dev/privkey.pem'),
+	})
+	port = 443
+} else {
+	server = http.createServer()
+	port = 8080
+}
+
 const wss = new WebSocketServer({ server })
 
-wss.on('connection', (ws, request) => {
-	console.log('A client has connected.')
-	ws.ip = request.socket.remoteAddress.slice(7)
-	ws.sendJson = function (data) {
-		this.send(JSON.stringify(data))
-	}
+const eventFiles = fs.readdirSync('./wss_events').filter((file) => file.endsWith('.js'))
+for (const file of eventFiles) {
+	const event = await import(`./wss_events/${file}`)
+	wss.on(event.default.name, (...args) => event.default.execute(...args))
+}
 
-	ws.on('error', console.error)
-	ws.on('message', (data) => parseIncoming(data, ws, wss))
-})
-
-server.listen(443, () => console.log(`Server listening on port 443`))
+server.listen(port, () => console.log(`Server listening on port ${port}`))
